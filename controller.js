@@ -12,17 +12,22 @@ exports.getCustomers = async (req, res) => {
     } else if (sortBy === 'time') {
       orderBy = 'ORDER BY created_at::time';
     }
-    const searchQuery = searchTerm
-      ? `WHERE customer_name ILIKE '%${searchTerm}%' OR location ILIKE '%${searchTerm}%'`
-      : '';
+    let searchConditions = '';
+    if (searchTerm) {
+      const searchWords = searchTerm.trim().split(/\s+/);
+      const searchClauses = searchWords.map(word => {
+        return `(customer_name ILIKE '%${word}%' OR location ILIKE '%${word}%')`;
+      });
+      searchConditions = `WHERE ${searchClauses.join(' AND ')}`;
+    }
     const query = `
       SELECT * FROM customer_records
-      ${searchQuery}
+      ${searchConditions}
       ${orderBy}
       LIMIT ${limit} OFFSET ${offset};
     `;
     const { rows } = await db.query(query);
-    const countQuery = `SELECT COUNT(*) AS total FROM customer_records ${searchQuery};`;
+    const countQuery = `SELECT COUNT(*) AS total FROM customer_records ${searchConditions};`;
     const totalCount = await db.query(countQuery);
     const totalPages = Math.ceil(totalCount.rows[0].total / limit);
     res.json({ data: rows, totalPages });
